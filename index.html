@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ambient Bassline Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tone@14.7.58/build/Tone.js"></script>
+    <!-- MIDI EXPORT START: Add Tonejs/Midi CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.27/build/Midi.js"></script>
+    <!-- MIDI EXPORT END -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c;
+            color: #e2e8f0;
+        }
+        .container {
+            max-width: 800px;
+        }
+        .bg-card {
+            background-color: #2d3748;
+        }
+        .hover\:bg-gray-600:hover {
+            background-color: #4a5568;
+        }
+        /* Custom styles for the message box */
+        #message-box {
+            position: fixed;
+            top: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 1rem 2rem;
+            border-radius: 0.5rem;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+        #message-box.show {
+            opacity: 1;
+        }
+        #message-box.error {
+            background-color: #f56565;
+            color: white;
+        }
+        #message-box.success {
+            background-color: #48bb78;
+            color: white;
+        }
+    </style>
+</head>
+<body class="p-6 md:p-10 flex items-center justify-center min-h-screen">
+
+    <div id="message-box" class="shadow-lg"></div>
+
+    <div class="container mx-auto p-6 md:p-8 bg-card rounded-xl shadow-2xl space-y-8">
+        <h1 class="text-4xl md:text-5xl font-bold text-center text-indigo-400">Ambient Bassline Generator</h1>
+        <p class="text-center text-gray-400 max-w-lg mx-auto">
+            Create sparse and repetitive basslines for your compositions. Set your parameters and generate a unique track.
+        </p>
+
+        <!-- Input Parameters Section -->
+        <div class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Tempo -->
+                <div>
+                    <label for="tempo" class="block text-gray-300 font-semibold mb-2">Tempo (BPM)</label>
+                    <input type="number" id="tempo" value="60" min="10" max="240"
+                           class="w-full bg-gray-700 text-gray-200 border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                </div>
+                <!-- Time Signature -->
+                <div>
+                    <label for="time-signature" class="block text-gray-300 font-semibold mb-2">Time Signature</label>
+                    <select id="time-signature"
+                            class="w-full bg-gray-700 text-gray-200 border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                        <option value="4/4">4/4</option>
+                        <option value="3/4">3/4</option>
+                        <option value="5/4">5/4</option>
+                        <option value="7/8">7/8</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Number of Measures -->
+            <div>
+                <label for="measures" class="block text-gray-300 font-semibold mb-2">Number of Measures (max. 64)</label>
+                <input type="number" id="measures" value="16" min="1" max="64"
+                       class="w-full bg-gray-700 text-gray-200 border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+            </div>
+
+            <!-- Pitch Selection -->
+            <fieldset class="bg-gray-700 p-6 rounded-xl border border-gray-600">
+                <legend class="text-lg font-bold text-gray-200 mb-4">Pitches</legend>
+
+                <div class="mb-4">
+                    <input type="radio" id="notes-option" name="pitch-option" value="notes" checked class="mr-2">
+                    <label for="notes-option" class="text-gray-300 font-medium">Specific Note Collection</label>
+                    <textarea id="notes-input" rows="2" placeholder="e.g., C2, F2, G3, A3"
+                              class="w-full mt-2 bg-gray-800 text-gray-200 border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"></textarea>
+                </div>
+
+                <div>
+                    <input type="radio" id="scale-option" name="pitch-option" value="scale" class="mr-2">
+                    <label for="scale-option" class="text-gray-300 font-medium">Root Note & Scale</label>
+                    <div id="scale-controls" class="grid grid-cols-2 gap-4 mt-2">
+                        <select id="root-note" disabled
+                                class="w-full bg-gray-800 text-gray-200 border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                            <option value="C">C</option>
+                            <option value="C#">C#</option>
+                            <option value="D">D</option>
+                            <option value="D#">D#</option>
+                            <option value="E">E</option>
+                            <option value="F">F</option>
+                            <option value="F#">F#</option>
+                            <option value="G">G</option>
+                            <option value="G#">G#</option>
+                            <option value="A">A</option>
+                            <option value="A#">A#</option>
+                            <option value="B">B</option>
+                        </select>
+                        <select id="scale-type" disabled
+                                class="w-full bg-gray-800 text-gray-200 border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                            <optgroup label="Common Scales">
+                                <option value="major">Major</option>
+                                <option value="minor">Minor</option>
+                                <option value="dorian">Dorian</option>
+                                <option value="phrygian">Phrygian</option>
+                                <option value="lydian">Lydian</option>
+                                <option value="mixolydian">Mixolydian</option>
+                                <option value="locrian">Locrian</option>
+                            </optgroup>
+                            <optgroup label="Messiaen Modes">
+                                <option value="messiaen1">Mode 1 (Whole Tone)</option>
+                                <option value="messiaen2">Mode 2 (Octatonic)</option>
+                                <option value="messiaen3">Mode 3</option>
+                                <option value="messiaen4">Mode 4</option>
+                                <option value="messiaen5">Mode 5</option>
+                                <option value="messiaen6">Mode 6</option>
+                                <option value="messiaen7">Mode 7</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                </div>
+            </fieldset>
+
+            <!-- Style/Feel -->
+            <div>
+                <label for="style-feel" class="block text-gray-300 font-semibold mb-2">Style / Feel</label>
+                <select id="style-feel"
+                        class="w-full bg-gray-700 text-gray-200 border border-gray-600 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                    <option value="sparse">Sparse & Repetitive</option>
+                    <option value="melodic">Melodic & Varied</option>
+                    <option value="arpeggiated">Arpeggiated</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Controls Section -->
+        <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
+            <button id="generate-btn"
+                    class="w-full md:w-1/2 bg-indigo-500 text-white font-bold py-3 rounded-md shadow-lg hover:bg-indigo-600 transition-all transform hover:scale-105">
+                Generate
+            </button>
+            <button id="play-btn"
+                    class="w-full md:w-1/2 bg-green-500 text-white font-bold py-3 rounded-md shadow-lg hover:bg-green-600 transition-all transform hover:scale-105"
+                    disabled>
+                Play
+            </button>
+            <!-- MIDI EXPORT START: Add Export MIDI button -->
+            <button id="export-midi-btn"
+                    class="w-full md:w-1/2 bg-yellow-500 text-white font-bold py-3 rounded-md shadow-lg hover:bg-yellow-600 transition-all transform hover:scale-105"
+                    disabled>
+                Export MIDI
+            </button>
+            <!-- MIDI EXPORT END -->
+        </div>
+
+        <!-- Generated Bassline Display -->
+        <div id="bassline-display" class="bg-gray-700 p-6 rounded-xl border border-gray-600">
+            <h3 class="text-xl font-bold text-gray-200 mb-4">Generated Bassline</h3>
+            <p id="note-display" class="text-gray-400 text-sm">Waiting for generation...</p>
+        </div>
+    </div>
+
+    <script>
+        window.onload = function() {
+            // Data and helper functions
+            const MESSIAEN_MODES = {
+                messiaen1: [0, 2, 4, 6, 8, 10], // Whole Tone
+                messiaen2: [0, 1, 3, 4, 6, 7, 9, 10], // Octatonic
+                messiaen3: [0, 2, 3, 4, 6, 7, 8, 10, 11],
+                messiaen4: [0, 1, 2, 5, 6, 7, 8, 11],
+                messiaen5: [0, 1, 5, 6, 7, 11],
+                messiaen6: [0, 2, 4, 5, 6, 8, 10, 11],
+                messiaen7: [0, 1, 2, 3, 5, 6, 7, 9, 10, 11]
+            };
+            const COMMON_MODES = {
+                major: [0, 2, 4, 5, 7, 9, 11],
+                minor: [0, 2, 3, 5, 7, 8, 10],
+                dorian: [0, 2, 3, 5, 7, 9, 10],
+                phrygian: [0, 1, 3, 5, 7, 8, 10],
+                lydian: [0, 2, 4, 6, 7, 9, 11],
+                mixolydian: [0, 2, 4, 5, 7, 9, 10],
+                locrian: [0, 1, 3, 4, 6, 8, 10]
+            };
+            const NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+            let generatedNotes = [];
+            let synth = null;
+            let part = null;
+            let isPlaying = false;
+            let isReady = false;
+
+            // UI elements
+            const tempoInput = document.getElementById('tempo');
+            const timeSignatureSelect = document.getElementById('time-signature');
+            const measuresInput = document.getElementById('measures');
+            const notesOption = document.getElementById('notes-option');
+            const notesInput = document.getElementById('notes-input');
+            const scaleOption = document.getElementById('scale-option');
+            const rootNoteSelect = document.getElementById('root-note');
+            const scaleTypeSelect = document.getElementById('scale-type');
+            const styleFeelSelect = document.getElementById('style-feel');
+            const generateBtn = document.getElementById('generate-btn');
+            const playBtn = document.getElementById('play-btn');
+            const noteDisplay = document.getElementById('note-display');
+            const messageBox = document.getElementById('message-box');
+            // MIDI EXPORT START: Get export button
+            const exportMidiBtn = document.getElementById('export-midi-btn');
+            // MIDI EXPORT END
+
+            // Function to show messages to the user
+            const showMessage = (text, type = 'success', duration = 3000) => {
+                messageBox.textContent = text;
+                messageBox.className = `shadow-lg show ${type}`;
+                setTimeout(() => {
+                    messageBox.classList.remove('show');
+                }, duration);
+            };
+
+            // Core logic to generate the bassline
+            const generateBassline = () => {
+                try {
+                    // Stop playback and clear the part's events before generating a new one
+                    stopPlayback();
+                    if (part) {
+                        part.clear();
+                    }
+                    Tone.Transport.cancel(); // Aggressively clear all scheduled events
+
+                    generatedNotes = [];
+                    isReady = false;
+                    playBtn.disabled = true;
+                    // MIDI EXPORT START: Disable export button until ready
+                    exportMidiBtn.disabled = true;
+                    // MIDI EXPORT END
+                    noteDisplay.textContent = 'Generating...';
+
+                    const tempo = parseInt(tempoInput.value, 10);
+                    const [numerator, denominator] = timeSignatureSelect.value.split('/').map(Number);
+                    const measures = parseInt(measuresInput.value, 10);
+                    const style = styleFeelSelect.value;
+                    const totalBeats = measures * numerator;
+
+                    let availableNotes = [];
+                    if (notesOption.checked) {
+                        availableNotes = notesInput.value.split(',').map(note => note.trim()).filter(note => note.length > 0);
+                        if (availableNotes.length === 0) {
+                            showMessage('Please provide at least one note.', 'error');
+                            noteDisplay.textContent = 'Error: No notes provided.';
+                            return;
+                        }
+                    } else {
+                        const root = rootNoteSelect.value;
+                        const scaleType = scaleTypeSelect.value;
+                        const rootMidi = NOTES.indexOf(root);
+                        let intervals;
+                        if (scaleType.startsWith('messiaen')) {
+                            intervals = MESSIAEN_MODES[scaleType];
+                        } else {
+                            intervals = COMMON_MODES[scaleType];
+                        }
+                        for (let octave = 2; octave <= 3; octave++) {
+                            intervals.forEach(interval => {
+                                const midiNote = rootMidi + interval + (octave * 12);
+                                availableNotes.push(Tone.Frequency(midiNote, "midi").toNote());
+                            });
+                        }
+                    }
+
+                    if (availableNotes.length === 0) {
+                        showMessage('Could not generate notes from the selected scale. Please check your settings.', 'error');
+                        noteDisplay.textContent = 'Error: Could not generate notes.';
+                        return;
+                    }
+
+                    // Algorithm for sparse and repetitive generation
+                    let currentNote = availableNotes[0];
+                    const variationChance = 0.2; // 20% chance of a variation
+                    const changeNoteChance = 0.4; // 40% chance of changing the note on variation
+
+                    // Pre-generate the notes to ensure we don't block the UI
+                    for (let i = 0; i < measures; i++) {
+                        // Change the current note at the start of each new measure for the 'sparse' style
+                        if (style === 'sparse' && availableNotes.length > 1) {
+                            currentNote = availableNotes[Math.floor(Math.random() * availableNotes.length)];
+                        }
+
+                        for (let j = 0; j < numerator; j++) {
+                            const beatStart = `${i}:${j}:0`;
+
+                            switch (style) {
+                                case 'sparse':
+                                    // Place a note on a strong beat (e.g., beat 1 or 3)
+                                    if (j === 0 || (j === 2 && numerator >= 4)) {
+                                        generatedNotes.push({ note: currentNote, time: beatStart, duration: "4n" });
+                                    }
+                                    break;
+                                case 'melodic':
+                                    // Change note at the start of the measure
+                                    if (j === 0) {
+                                        currentNote = availableNotes[Math.floor(Math.random() * availableNotes.length)];
+                                        generatedNotes.push({ note: currentNote, time: beatStart, duration: "8n" });
+                                    }
+                                    // Place notes on off-beats for variation
+                                    else if (Math.random() < 0.3) {
+                                        const randomNote = availableNotes[Math.floor(Math.random() * availableNotes.length)];
+                                        generatedNotes.push({ note: randomNote, time: beatStart, duration: "8n" });
+                                    }
+                                    break;
+                                case 'arpeggiated':
+                                    const arpeggioNotes = [
+                                        availableNotes[0],
+                                        availableNotes[Math.min(1, availableNotes.length - 1)],
+                                        availableNotes[Math.min(2, availableNotes.length - 1)],
+                                        availableNotes[Math.min(3, availableNotes.length - 1)]
+                                    ];
+                                    generatedNotes.push({ note: arpeggioNotes[j % arpeggioNotes.length], time: beatStart, duration: "4n" });
+                                    break;
+                            }
+                        }
+                    }
+
+                    // If no notes were generated, try again or show an error.
+                    if (generatedNotes.length === 0) {
+                        showMessage('Could not generate a bassline. Please try different parameters.', 'error');
+                        noteDisplay.textContent = 'Error: No bassline generated.';
+                        return;
+                    }
+
+                    noteDisplay.innerHTML = `
+                        <p class="font-bold text-gray-300">Total Notes: ${generatedNotes.length}</p>
+                        <p class="text-gray-400 mt-2">Notes:</p>
+                        <ul class="list-disc list-inside text-gray-400 max-h-48 overflow-y-auto">
+                            ${generatedNotes.slice(0, 50).map(n => `<li>${n.note} at ${n.time}</li>`).join('')}
+                            ${generatedNotes.length > 50 ? '<li>...</li>' : ''}
+                        </ul>
+                    `;
+                    isReady = true;
+                    playBtn.disabled = false;
+                    // MIDI EXPORT START: Enable export button when ready
+                    exportMidiBtn.disabled = false;
+                    // MIDI EXPORT END
+                    showMessage('Bassline generated successfully!');
+                } catch (error) {
+                    console.error("Error generating bassline:", error);
+                    showMessage('An error occurred during generation. Check the console for details.', 'error');
+                    noteDisplay.textContent = 'Error: ' + error.message;
+                    // MIDI EXPORT START: Disable export button on error
+                    exportMidiBtn.disabled = true;
+                    // MIDI EXPORT END
+                }
+            };
+
+            // Function to set up and play the audio
+            const setupAndPlay = async () => {
+                // Check if Tone.js is loaded
+                if (typeof Tone === 'undefined') {
+                    showMessage('Tone.js library not loaded. Please try again.', 'error');
+                    return;
+                }
+
+                if (synth === null) {
+                    // Initialize Tone.js audio context and synth
+                    await Tone.start();
+                    synth = new Tone.MonoSynth({
+                        oscillator: { type: "sine" },
+                        envelope: {
+                            attack: 0.1,
+                            decay: 0.2,
+                            sustain: 0.5,
+                            release: 0.8
+                        },
+                        filterEnvelope: {
+                            baseFrequency: 200,
+                            attack: 0.5,
+                            decay: 0.5
+                        }
+                    }).toDestination();
+                    // Add a low-pass filter for a bassier sound
+                    const lowpass = new Tone.Filter(300, "lowpass").toDestination();
+                    synth.connect(lowpass);
+                }
+
+                // If part doesn't exist, create it.
+                if (part === null) {
+                    part = new Tone.Part((time, value) => {
+                        synth.triggerAttackRelease(value.note, value.duration, time);
+                    }, generatedNotes);
+                } else {
+                    // Clear existing events and add new ones
+                    part.clear();
+                    generatedNotes.forEach(note => {
+                        part.add(note.time, note);
+                    });
+                }
+                
+                // Set up transport and start
+                Tone.Transport.bpm.value = parseInt(tempoInput.value, 10);
+                part.start(0);
+                Tone.Transport.start();
+            };
+
+            // Function to stop audio playback
+            const stopPlayback = () => {
+                if (Tone.Transport.state === 'started') {
+                    Tone.Transport.stop();
+                }
+                if (part) {
+                    part.stop(0);
+                }
+                isPlaying = false;
+                playBtn.textContent = 'Play';
+                playBtn.classList.remove('bg-red-500', 'hover:bg-red-600');
+                playBtn.classList.add('bg-green-500', 'hover:bg-green-600');
+            };
+
+            // Event listeners for pitch selection radio buttons
+            notesOption.addEventListener('change', () => {
+                notesInput.disabled = false;
+                rootNoteSelect.disabled = true;
+                scaleTypeSelect.disabled = true;
+            });
+            scaleOption.addEventListener('change', () => {
+                notesInput.disabled = true;
+                rootNoteSelect.disabled = false;
+                scaleTypeSelect.disabled = false;
+            });
+
+            // Main event listeners
+            generateBtn.addEventListener('click', generateBassline);
+
+            playBtn.addEventListener('click', () => {
+                if (isPlaying) {
+                    stopPlayback();
+                } else {
+                    setupAndPlay();
+                    isPlaying = true;
+                    playBtn.textContent = 'Stop';
+                    playBtn.classList.remove('bg-green-500', 'hover:bg-green-600');
+                    playBtn.classList.add('bg-red-500', 'hover:bg-red-600');
+                }
+            });
+
+            // MIDI EXPORT START: Export MIDI logic
+            exportMidiBtn.addEventListener('click', () => {
+                if (!window.Midi) {
+                    showMessage('MIDI library not loaded.', 'error');
+                    return;
+                }
+                if (!generatedNotes || generatedNotes.length === 0) {
+                    showMessage('No bassline to export.', 'error');
+                    return;
+                }
+
+                // Get tempo from UI
+                const tempo = parseInt(tempoInput.value, 10) || 60;
+
+                // Create MIDI
+                const midi = new window.Midi();
+                midi.header.setTempo(tempo);
+
+                const track = midi.addTrack();
+
+                // Convert Tone.js note/duration to MIDI
+                generatedNotes.forEach(n => {
+                    // n.note is like "C2", "G#3", etc.
+                    // n.time is like "0:0:0", "1:2:0", etc.
+                    // n.duration is like "4n", "8n", etc.
+
+                    // Convert Tone.js time to seconds
+                    const timeSeconds = Tone.Time(n.time).toSeconds();
+                    const durationSeconds = Tone.Time(n.duration).toSeconds();
+
+                    track.addNote({
+                        name: n.note,
+                        time: timeSeconds,
+                        duration: durationSeconds,
+                        velocity: 0.8
+                    });
+                });
+
+                // Download
+                const bytes = midi.toArray();
+                const blob = new Blob([bytes], { type: 'audio/midi' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'bassline.mid';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                showMessage('MIDI file exported!', 'success');
+            });
+            // MIDI EXPORT END
+
+            // Stop playback if transport reaches the end
+            // This event listener needs to be inside window.onload to ensure Tone.js is defined
+            Tone.Transport.on('stop', () => {
+                stopPlayback();
+            });
+        };
+    </script>
+</body>
+</html>
